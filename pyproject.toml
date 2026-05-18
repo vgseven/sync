@@ -1,0 +1,97 @@
+[project]
+name = "habibinext-backend"
+version = "1.0.0"
+description = "Project Habibi Next Backend for Flutter, Web and Admin Panel Application."
+readme = "README.md"
+requires-python = ">=3.12.3"
+
+# --- Dependencies Group ---
+dependencies = [
+    "aiohttp>=3.12.15",
+    "asyncpg>=0.30.0",
+    "bcrypt>=4.2.1",
+    "boto3>=1.37.28",
+    "celery[redis]>=5.5.2",
+    "cryptography>=44.0.2",
+    "fastapi[standard]>=0.128.2",
+    "firebase-admin>=6.7.0",
+    "gunicorn>=23.0.0",
+    "jwcrypto>=1.5.6",
+    "logging>=0.4.9.6",
+    "openpyxl>=3.1.5",
+    "pillow>=11.2.1",
+    "pydantic>=2.10.5",
+    "pyjwt>=2.10.1",
+    "pypdf>=5.4.0",
+    "python-docx>=1.1.2",
+    "python-dotenv>=1.0.1",
+    "python-jose[cryptography]>=3.5.0",
+    "pytz>=2025.2",
+    "razorpay>=1.4.2",
+    "redis>=5.2.1",
+    "requests>=2.32.3",
+    "resend>=2.6.0",
+    "setuptools<81",
+    "tzdata>=2025.1",
+    "uuid6>=2025.0.1",
+    "websockets>=14.2",
+    "alembic>=1.17.2",
+    "psycopg[binary]>=3.3.2",
+    "sqlalchemy[asyncio]>=2.0.45",
+    "twilio>=9.10.2",
+    "playwright>=1.59.0",
+]
+
+# --- Dev Dependency Groups ---
+[dependency-groups]
+dev = [
+    "ruff>=0.15.0",
+    "pre-commit>=4.5.1",
+    "ty>=0.0.15",
+    "types-redis>=4.6.0.20241004",
+]
+
+# --- Ruff Configuration ---
+[tool.ruff]
+target-version = "py311"
+exclude = [".venv", ".ruff_cache", "**/__pycache__", ".git", "alembic"]
+line-length = 88
+indent-width = 4
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "C4", "UP"]
+ignore = ["E501", "B008"]
+fixable = ["ALL"]
+unfixable = []
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+# --- Ty Configuration ---
+[tool.ty]
+
+# Environment
+[tool.ty.environment]
+python-version = "3.12"
+python-platform = "all"
+
+# Source Configuration
+[tool.ty.src]
+include = ["src", "alembic/env.py"]
+exclude = [".venv", ".ruff_cache", "**/__pycache__", ".git"]
+respect-ignore-files = true
+
+# Rules Configuration
+[tool.ty.rules]
+unresolved-import = "error"
+invalid-method-override = "error"
+call-non-callable = "error"
+conflicting-declarations = "error"
+
+# Terminal Output Configuration
+[tool.ty.terminal]
+output-format = "concise"
