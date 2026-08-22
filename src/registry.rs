@@ -1,3 +1,9 @@
+//! PyPI and npm latest-version lookups.
+//!
+//! A single reusable HTTP client provides connection reuse. Callers pass a
+//! bounded concurrency value so large manifests do not overwhelm registries or
+//! the local network.
+
 use crate::model::Ecosystem;
 use anyhow::{Context, Result, bail};
 use futures::{StreamExt, stream};
@@ -17,6 +23,7 @@ pub struct RegistryClient {
 }
 
 impl RegistryClient {
+    /// Build the shared client once per command invocation.
     pub fn new(pypi_base: String, npm_base: String, timeout_seconds: u64) -> Result<Self> {
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(timeout_seconds))
@@ -32,6 +39,8 @@ impl RegistryClient {
     }
 
     pub async fn fetch_many(&self, keys: Vec<LookupKey>, concurrency: usize) -> LookupResults {
+        // buffer_unordered starts at most `concurrency` requests while allowing
+        // faster registries/packages to complete without head-of-line blocking.
         stream::iter(keys.into_iter().map(|key| {
             let client = self.clone();
             async move {
@@ -94,6 +103,8 @@ fn trim_trailing_slash(value: &str) -> String {
 }
 
 fn encode_path_segment(value: &str) -> String {
+    // Package names are one URL path segment. In particular, scoped npm names
+    // must encode their slash instead of becoming a second path component.
     let mut encoded = String::new();
     for byte in value.bytes() {
         match byte {
@@ -107,6 +118,8 @@ fn encode_path_segment(value: &str) -> String {
 }
 
 pub fn normalize_lookup_name(ecosystem: Ecosystem, name: &str) -> String {
+    // PyPI normalizes '-', '_' and '.' as equivalent; npm package names retain
+    // their spelling because scoped names and case are registry-significant.
     match ecosystem {
         Ecosystem::Python => name
             .chars()

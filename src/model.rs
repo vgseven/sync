@@ -1,3 +1,8 @@
+//! Shared data model passed between discovery, parsing, lookup, and output.
+//!
+//! This module has no filesystem or network behavior. Keeping the model pure
+//! makes format-specific parsers and report generation easier to reason about.
+
 use serde::Serialize;
 use std::fmt;
 use std::path::PathBuf;
@@ -27,28 +32,25 @@ pub enum RequirementSyntax {
 
 #[derive(Clone, Debug)]
 pub enum DependencyLocation {
-    Json {
-        section: String,
-        key: String,
-    },
-    TomlArray {
-        path: Vec<String>,
-        index: usize,
-    },
+    /// JSON object member, used when re-rendering `package.json`.
+    Json { section: String, key: String },
+    /// TOML array item, used for PEP 621-style dependency arrays.
+    TomlArray { path: Vec<String>, index: usize },
+    /// TOML table key, optionally targeting a nested `version` field.
     TomlKey {
         path: Vec<String>,
         key: String,
         field: Option<String>,
     },
-    TextSpan {
-        start: usize,
-        end: usize,
-    },
+    /// Byte range within a text manifest such as requirements.txt or setup.cfg.
+    TextSpan { start: usize, end: usize },
 }
 
 #[derive(Clone, Debug)]
 pub struct Dependency {
+    /// Name as written in the manifest and shown to the user.
     pub name: String,
+    /// Registry name after handling aliases and ecosystem-specific normalization.
     pub lookup_name: String,
     pub ecosystem: Ecosystem,
     pub group: String,
@@ -112,6 +114,8 @@ pub struct ReportRow {
     pub status: ReportStatus,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
+    // These fields connect a report row back to a parsed source declaration.
+    // They stay out of JSON output because they are implementation details.
     #[serde(skip)]
     pub manifest_index: usize,
     #[serde(skip)]

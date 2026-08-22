@@ -1,3 +1,8 @@
+//! Command-line argument definitions.
+//!
+//! Clap owns user-facing help text and validation, while `app` owns command
+//! behavior. Keeping the two separate makes CLI changes easier to test.
+
 use clap::{Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
 
@@ -18,7 +23,7 @@ pub struct Cli {
     #[arg(long, global = true, value_enum, default_value_t = EcosystemFilter::All)]
     pub ecosystem: EcosystemFilter,
 
-    /// Scan nested projects in addition to Node.js workspaces.
+    /// Scan nested directories for supported dependency manifests.
     #[arg(short, long, global = true)]
     pub recursive: bool,
 
@@ -89,6 +94,7 @@ pub enum Command {
 }
 
 impl Cli {
+    /// Parse process arguments through Clap so all commands share validation.
     pub fn parse_args() -> Self {
         Self::parse()
     }

@@ -6,11 +6,16 @@ release. They are not part of the current implementation.
 ## Release Packaging
 
 - GitHub Actions CI and tag-triggered macOS release builds are implemented.
-- macOS `aarch64-apple-darwin` and `x86_64-apple-darwin` archives, checksums,
-  GitHub Releases, and a checksum-verifying curl installer are implemented.
+- Apple Silicon macOS `aarch64-apple-darwin` archives, checksums, GitHub
+  Releases, and the cargo-dist-generated curl installer are implemented.
 - Add Apple Developer ID signing, notarization, and CI secrets before calling
   the macOS installer Gatekeeper-trusted.
-- Add Linux release targets and extend `install.sh` to support Linux.
+- Add and test `x86_64-apple-darwin` before documenting Intel macOS support.
+- Resolve cargo-dist shell-installer verification on stock macOS: version 0.32
+  checks SHA-256 only through `sha256sum`, while macOS ships `shasum -a 256`.
+  Do not claim enforced checksum verification for the curl installer until this
+  is supported upstream or a separately reviewed installer is adopted.
+- Add Linux release targets; cargo-dist will extend the generated shell installer.
 - Add `x86_64-pc-windows-msvc` releases and a PowerShell installer.
 - Evaluate package-manager distribution through Homebrew, Scoop, Winget,
   Cargo, npm, or PyPI wrapper packages.

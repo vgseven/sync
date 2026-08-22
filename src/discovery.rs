@@ -1,3 +1,9 @@
+//! Filesystem discovery for supported dependency manifests.
+//!
+//! Discovery is deliberately conservative by default: the requested root and
+//! its `requirements/` directory are inspected first. Recursive scanning is
+//! opt-in because it can traverse large multi-project repositories.
+
 use crate::cli::EcosystemFilter;
 use crate::manifest::infer_kind;
 use crate::model::{Ecosystem, ManifestKind};
@@ -14,6 +20,8 @@ const ROOT_MANIFESTS: &[&str] = &[
     "requirements.in",
 ];
 
+// Generated dependency and build directories are both noisy and expensive to
+// traverse. Extend this list when a newly supported ecosystem adds a cache.
 const SKIP_DIRS: &[&str] = &[
     ".git",
     "node_modules",
@@ -48,6 +56,8 @@ pub fn discover(path: &Path, ecosystem: EcosystemFilter, recursive: bool) -> Res
         bail!("{} is not a file or directory", path.display());
     }
 
+    // Preserve deterministic output and prevent root/recursive discovery from
+    // returning the same manifest twice.
     let mut manifests = BTreeSet::new();
     collect_root_manifests(&path, ecosystem, &mut manifests)?;
 
@@ -68,6 +78,8 @@ fn collect_root_manifests(
     ecosystem: EcosystemFilter,
     manifests: &mut BTreeSet<PathBuf>,
 ) -> Result<()> {
+    // Probe known root-level names instead of reading every file in a normal
+    // project directory. Recursive mode handles nested project roots later.
     for name in ROOT_MANIFESTS {
         let candidate = root.join(name);
         if candidate.is_file() {
@@ -89,6 +101,8 @@ fn collect_requirements_files(
         return Ok(());
     }
 
+    // Python projects commonly split requirements into a dedicated directory.
+    // This intentionally stays shallow; recursive scanning is separately opt-in.
     for entry in
         std::fs::read_dir(root).with_context(|| format!("failed to read {}", root.display()))?
     {
@@ -117,6 +131,8 @@ fn collect_recursive(
             if should_skip_dir(&path) {
                 continue;
             }
+            // Check conventional manifest names before walking deeper. The
+            // BTreeSet handles a later generic file match for the same path.
             collect_root_manifests(&path, ecosystem, manifests)?;
             collect_recursive(&path, ecosystem, manifests)?;
         } else if file_type.is_file() && infer_kind(&path).is_ok() {

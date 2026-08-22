@@ -1,5 +1,12 @@
+//! User-facing notices for lockfile work that has not been implemented yet.
+//!
+//! Updates currently change only manifest declarations. This module makes the
+//! missing package-manager-specific lockfile step explicit instead of silently
+//! implying that an updated manifest has refreshed its lockfile.
+
 use std::path::Path;
 
+/// Return the follow-up lockfile action relevant to a changed manifest.
 pub fn planned_lockfile_note(manifest_path: &Path) -> Option<String> {
     let file_name = manifest_path.file_name()?.to_str()?;
     match file_name {

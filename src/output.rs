@@ -1,3 +1,8 @@
+//! Human-readable table and machine-readable JSON report rendering.
+//!
+//! Both output formats are derived from the same `ReportRow` list so automation
+//! sees the same status decisions that a terminal user sees.
+
 use crate::cli::OutputFormat;
 use crate::model::{ReportRow, ReportStatus};
 use anyhow::Result;
@@ -21,6 +26,7 @@ pub struct Summary {
 }
 
 impl Summary {
+    /// Count each terminal status once for exit-code and report consumers.
     pub fn from_rows(rows: &[ReportRow]) -> Self {
         let mut summary = Self {
             total: rows.len(),
@@ -104,6 +110,7 @@ fn print_table(rows: &[ReportRow]) {
 }
 
 fn truncate(value: &str, max: usize) -> String {
+    // Count characters rather than bytes so table truncation never splits UTF-8.
     if value.chars().count() <= max {
         return value.to_string();
     }

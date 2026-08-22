@@ -1,3 +1,9 @@
+//! Dependency declaration parsing, comparison, and conservative replacement.
+//!
+//! Version ranges are intentionally handled as a small safe subset. When a
+//! declaration cannot be proven safe to rewrite, this module reports it as
+//! skipped instead of guessing at package-manager semantics.
+
 use crate::model::{Dependency, ReportStatus, RequirementSyntax};
 use std::cmp::Ordering;
 
@@ -33,6 +39,8 @@ pub fn parse_pep508(value: &str) -> Option<Pep508Parts> {
         cursor += value[cursor..].chars().next()?.len_utf8();
     }
 
+    // Environment markers begin at an unquoted semicolon and must survive a
+    // version replacement unchanged.
     let marker = find_unquoted_marker(&value[cursor..], ';')
         .map(|offset| cursor + offset)
         .unwrap_or(value.len());
@@ -98,6 +106,8 @@ pub fn node_registry_target(name: &str, requirement: &str) -> (String, Option<St
         "https:",
     ];
 
+    // These values point outside the public npm registry, so neither lookup nor
+    // automatic rewrite is meaningful.
     if local_prefixes
         .iter()
         .any(|prefix| lower.starts_with(prefix))
@@ -218,6 +228,8 @@ fn update_single_constraint(
     if trimmed.is_empty() || trimmed == "*" {
         return Err("unconstrained dependencies are left unchanged".to_string());
     }
+    // A compound range can encode an intentional compatibility policy. Never
+    // collapse it to the registry latest version automatically.
     if has_compound_range(trimmed) {
         return Err("compound version ranges are not rewritten".to_string());
     }
@@ -342,6 +354,8 @@ struct LooseVersion {
 }
 
 impl LooseVersion {
+    /// Parse only enough structure to consistently order common Python and npm
+    /// release strings. This is not a complete PEP 440 or npm semver parser.
     fn parse(value: &str) -> Self {
         let value = value.trim().trim_start_matches('v');
         let value = value

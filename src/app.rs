@@ -1,3 +1,10 @@
+//! Application orchestration for `check` and `update`.
+//!
+//! The flow is intentionally linear: discover manifests, parse declarations,
+//! deduplicate registry lookups, evaluate report rows, then optionally write
+//! safe updates. Parsing and writing remain separate so `check` cannot mutate
+//! user files.
+
 use crate::cli::{Cli, Command};
 use crate::discovery::discover;
 use crate::lockfile::planned_lockfile_note;
@@ -37,6 +44,8 @@ pub async fn run() -> Result<u8> {
     }
 
     let client = RegistryClient::new(cli.pypi_url, cli.npm_registry, cli.timeout)?;
+    // One request is made per normalized package and ecosystem, even when the
+    // dependency appears in multiple manifests or dependency groups.
     let lookups = client
         .fetch_many(lookup_keys(&manifests), usize::from(cli.concurrency.max(1)))
         .await;
@@ -101,6 +110,8 @@ fn load_manifests(paths: &[PathBuf], filter: &PackageFilter) -> Result<Vec<Manif
 }
 
 fn lookup_keys(manifests: &[Manifest]) -> Vec<LookupKey> {
+    // BTreeSet both removes duplicate lookups and gives deterministic request
+    // ordering, which keeps JSON/table reports stable between equivalent runs.
     let mut keys = BTreeSet::new();
     for manifest in manifests {
         for dependency in &manifest.dependencies {
@@ -131,6 +142,8 @@ fn build_rows(
                 normalize_lookup_name(dependency.ecosystem, &dependency.lookup_name),
             );
 
+            // Dependencies that cannot be safely rewritten are still reported,
+            // but never trigger a registry request or an update attempt.
             let (latest, status, message, replacement) =
                 if let Some(reason) = &dependency.skip_reason {
                     (None, ReportStatus::Skipped, Some(reason.clone()), None)
@@ -171,6 +184,8 @@ fn build_rows(
 }
 
 fn collect_updates(rows: &[ReportRow]) -> HashMap<usize, HashMap<usize, String>> {
+    // Indices refer back to the parsed manifest/dependency vectors, avoiding
+    // fragile source-text searches when rendering an update.
     let mut updates: HashMap<usize, HashMap<usize, String>> = HashMap::new();
     for row in rows {
         if row.status == ReportStatus::Outdated {
@@ -194,6 +209,9 @@ fn write_updates(
             .get(*manifest_index)
             .context("invalid manifest update index")?;
         let rendered = manifest.render(dependency_updates)?;
+        // Render first and write once per manifest. Registry errors are checked
+        // before this function is called, preventing partial network results
+        // from producing partial dependency updates.
         std::fs::write(&manifest.path, rendered)
             .with_context(|| format!("failed to write {}", manifest.path.display()))?;
     }
@@ -210,6 +228,7 @@ fn print_lockfile_notes(manifests: &[Manifest], updates: &HashMap<usize, HashMap
         }
     }
 
+    // Several manifests may need the same follow-up, so only print each note once.
     for note in notes {
         eprintln!("note: {note}");
     }
@@ -262,6 +281,8 @@ impl PackageFilter {
             return true;
         }
 
+        // Compare both the declaration name and registry lookup name. This
+        // allows users to select npm aliases as either local or target names.
         let normalized = normalize_lookup_name(dependency.ecosystem, &dependency.lookup_name)
             .to_ascii_lowercase();
         self.raw.contains(&dependency.name.to_ascii_lowercase()) || self.raw.contains(&normalized)

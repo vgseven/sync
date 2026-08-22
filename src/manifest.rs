@@ -1,3 +1,9 @@
+//! Manifest parsing and safe source rendering.
+//!
+//! Parsers produce a common `Dependency` model plus a precise source location.
+//! Renderers use that location to update only approved declarations while
+//! preserving unrelated TOML/text content where the format permits it.
+
 use crate::model::{
     Dependency, DependencyLocation, Ecosystem, Manifest, ManifestKind, RequirementSyntax,
 };
@@ -10,6 +16,7 @@ use std::path::Path;
 use toml_edit::{DocumentMut, Item, Value as TomlValue};
 
 impl Manifest {
+    /// Read one supported manifest and retain its original text for update mode.
     pub fn load(path: &Path) -> Result<Self> {
         let kind = infer_kind(path)?;
         let original = std::fs::read_to_string(path)
@@ -30,6 +37,8 @@ impl Manifest {
         })
     }
 
+    /// Render requested dependency replacements using the source format's
+    /// native structure rather than doing a global text replacement.
     pub fn render(&self, updates: &HashMap<usize, String>) -> Result<String> {
         match self.kind {
             ManifestKind::PackageJson => {
@@ -73,6 +82,8 @@ fn parse_package_json(content: &str, path: &Path) -> Result<Vec<Dependency>> {
         .with_context(|| format!("failed to parse {}", path.display()))?;
     let mut dependencies = Vec::new();
 
+    // Keep dependency groups distinct: the same package can intentionally use
+    // a different constraint in production and development sections.
     for section in [
         "dependencies",
         "devDependencies",
@@ -113,6 +124,8 @@ fn parse_pyproject(content: &str, path: &Path) -> Result<Vec<Dependency>> {
         .with_context(|| format!("failed to parse {}", path.display()))?;
     let mut dependencies = Vec::new();
 
+    // PEP 621, PEP 735, and Poetry store requirements in different shapes.
+    // Normalize all supported shapes into the shared dependency model.
     collect_pep508_array(
         &document,
         &["project", "dependencies"],
@@ -244,6 +257,9 @@ fn collect_python_map(
             continue;
         }
 
+        // Poetry-style tables may declare version plus path/git/url metadata.
+        // Preserve the version for reporting but mark external sources unsafe
+        // for automatic replacement.
         let (requirement, field, skip_reason) = if let Some(value) = item.as_str() {
             (value.to_string(), None, None)
         } else if let Some(inline) = item.as_inline_table() {
@@ -305,6 +321,8 @@ fn parse_requirements(content: &str) -> Vec<Dependency> {
         let line_without_newline = line_without_newline
             .strip_suffix('\r')
             .unwrap_or(line_without_newline);
+        // Offsets are retained so rendering can replace this exact declaration
+        // without disturbing comments or adjacent lines.
         collect_text_dependency(
             line_without_newline,
             offset,
@@ -401,6 +419,8 @@ fn collect_text_dependency(
         return;
     }
 
+    // A comment only starts after whitespace so URL fragments and quoted marker
+    // values are not accidentally truncated.
     let comment = trimmed
         .find(" #")
         .or_else(|| trimmed.find("\t#"))
@@ -455,6 +475,8 @@ fn render_package_json(
         *value = JsonValue::String(replacement.clone());
     }
 
+    // JSON has no comments, but preserving indentation and line endings avoids
+    // unnecessary formatting churn in an otherwise small dependency update.
     let indent = detect_json_indent(content);
     let formatter = serde_json::ser::PrettyFormatter::with_indent(indent.as_bytes());
     let writer = Vec::new();
@@ -564,6 +586,8 @@ fn render_text(
         };
         edits.push((start, end, replacement));
     }
+    // Apply from the end of the file so replacing one span never invalidates
+    // byte offsets recorded for an earlier declaration.
     edits.sort_by(|left, right| right.0.cmp(&left.0));
 
     let mut rendered = content.to_string();

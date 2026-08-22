@@ -1,17 +1,21 @@
 [workspace]
 members = ["cargo:."]
 
-# Config for 'dist'
+# cargo-dist reads this workspace-level file to generate release artifacts,
+# the public shell installer, and .github/workflows/release.yml.
 [dist]
-# The preferred dist version to use in CI (Cargo.toml SemVer syntax)
+# Keep the release tool version pinned so local and GitHub builds agree.
 cargo-dist-version = "0.32.0"
-# CI backends to support
-ci = "github"
-# The installers to generate for each app
+# GitHub Releases are both the artifact host and the release announcement path.
+ci = ["github"]
+# This produces relay-sync-installer.sh for the documented curl | sh command.
 installers = ["shell"]
-# Target platforms to build apps for (Rust target-triple syntax)
+# The initial public release supports native Apple Silicon Macs only.
+# Add x86_64-apple-darwin only when Intel macOS support is intentionally tested.
 targets = ["aarch64-apple-darwin"]
-# Path that installers should place binaries in
-install-path = "CARGO_HOME"
-# Whether to install an updater program
+# Install without requiring Rust or polluting Cargo's own binary directory.
+install-path = "~/.local/bin"
+# Make checksum generation explicit; the shell installer embeds the selected hash.
+checksum = "sha256"
+# Updates are delivered by rerunning the installer, not by a background updater.
 install-updater = false
