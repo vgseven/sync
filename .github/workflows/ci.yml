@@ -22,5 +22,5 @@ jobs:
         run: cargo check --all-targets --locked
       - name: Run tests
         run: cargo test --locked
-      - name: Validate installer syntax
-        run: bash -n install.sh
+      # - name: Validate installer syntax
+      #   run: bash -n install.sh

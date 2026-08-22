@@ -29,3 +29,8 @@ tempfile = "3"
 codegen-units = 1
 lto = "thin"
 strip = "symbols"
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"
